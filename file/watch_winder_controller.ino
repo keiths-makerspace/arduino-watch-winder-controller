@@ -12,7 +12,7 @@
  * - 2x 3V DC gear motors (300mA each)
  * - USB-C 5V power supply
  * 
- * Author: [Your Name]
+ * Author: Keith Refior
  * License: MIT
  * Date: November 2025
  */
@@ -223,4 +223,5 @@ void stopMotors() {
  * Note on millis() overflow:
  * The millis() function overflows after ~49 days. This code handles
  * overflow gracefully since all timing comparisons are relative.
+
  */
