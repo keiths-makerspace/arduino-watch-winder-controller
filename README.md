@@ -7,14 +7,16 @@ A simple and reliable dual watch winder controller using Arduino Nano R4 and DRV
 - Controls two independent watch winder motors
 - Configurable duty cycle (default: 3 min run / 60 min rest)
 - Bidirectional rotation (alternates each cycle)
-- ~720-800 turns per day (TPD) - suitable for most automatic watches
+- ~900 turns per day (TPD) at ~13 RPM - adjustable for most automatic watches
 - Manual on/off switches for each motor
 - USB-C powered (5V)
 
 ## Suitable for
 
-This duty cycle works well for:
+The default duty cycle suits:
 - **Seiko** automatic watches (700-900 TPD)
+
+For these, increase the rest time to about 75 minutes (~740 TPD):
 - **Bering** automatic watches (650-800 TPD)
 - Most **Rolex, Omega, Tag Heuer** (650-800 TPD)
 - Other brands with similar requirements
@@ -25,7 +27,8 @@ This duty cycle works well for:
 - Arduino Nano R4 (or compatible)
 - DRV8833 dual motor driver board
 - 2x 3V DC gear motors (tested with 300mA motors)
-- USB-C panel mount connector or breakout board
+- USB-C panel mount connector or breakout board (with 5.1k pull-downs on CC1 and CC2 if you use a USB-C to USB-C adapter)
+- USB-C plug pigtail (5V and GND only) to power the Arduino from the same input
 - USB-C power adapter (5V, 2A recommended)
 - 2x SPST switches (for manual motor control)
 - Jumper wires
@@ -37,11 +40,10 @@ Approximately $15-25 depending on parts sourcing.
 ## Wiring Diagram
 
 ```
-USB-C 5V Power → Arduino Nano R4 VIN
+USB-C 5V ─────→ DRV8833 VCC (motor power)
+USB-C 5V ─────→ DRV8833 nSLEEP (keep awake)
+USB-C 5V/GND ─→ USB-C plug pigtail → Arduino Nano R4 USB-C port
 USB-C GND ────→ Arduino GND ──→ DRV8833 GND
-
-Arduino 5V ───→ DRV8833 VCC (motor power)
-Arduino 5V ───→ DRV8833 nSLEEP (keep awake)
 
 Arduino Pin 2 → DRV8833 AIN1
 Arduino Pin 3 → DRV8833 AIN2
@@ -55,7 +57,12 @@ DRV8833 BOUT1 → Switch 2 → Motor 2 positive
 DRV8833 BOUT2 ───────────→ Motor 2 negative
 ```
 
-**Note:** DRV8833 SENSE pins can be left unconnected.
+**Notes:**
+- Don't feed 5V into VIN. It's rated for 6-21V on the Nano R4.
+- If your DRV8833 board brings out the SENSE pins, connect them to GND unless the board has its own sense resistors.
+- Unplug the pigtail from the Arduino before connecting a computer to program it.
+
+A KiCad schematic of this wiring is in [`kicad/`](kicad/watch_winder_controller.kicad_pro).
 
 ## Installation
 
@@ -82,7 +89,8 @@ DRV8833 BOUT2 ───────────→ Motor 2 negative
 
 6. **Test:**
    - Power on via USB-C
-   - Both motors should run for 3 minutes, then pause for 60 minutes
+   - Motor 1 starts immediately and Motor 2 starts 90 seconds later
+   - Each motor runs for 3 minutes, then pauses for 55-65 minutes
    - Direction alternates each cycle
    - Switches provide manual on/off control
 
@@ -91,17 +99,22 @@ DRV8833 BOUT2 ───────────→ Motor 2 negative
 Edit these values in `watch_winder_controller.ino` to customize:
 
 ```cpp
-const int RUN_TIME = 180000;      // Run time in milliseconds (default: 3 min)
-const int REST_TIME = 3600000;    // Rest time in milliseconds (default: 60 min)
+const unsigned long RUN_TIME = 180000;           // Run time in milliseconds (default: 3 min)
+const unsigned long REST_TIME_BASE = 3600000;    // Rest time in milliseconds (default: 60 min)
+const unsigned long REST_TIME_VARIANCE = 300000; // Random rest variation (default: +/- 5 min)
+const unsigned long STARTUP_STAGGER = 90000;     // Motor 2 start delay (default: 1.5 min)
 ```
 
 ### TPD Adjustment Guide
 
+Based on a 3-minute run at ~13 RPM (~40 turns per cycle). TPD scales with motor speed, so measure your winder's RPM.
+
 | Rest Time | Approximate TPD |
 |-----------|----------------|
-| 45 min    | ~1000 TPD      |
-| 60 min    | ~800 TPD       |
-| 90 min    | ~550 TPD       |
+| 45 min    | ~1200 TPD      |
+| 60 min    | ~900 TPD       |
+| 75 min    | ~740 TPD       |
+| 90 min    | ~620 TPD       |
 
 ## Troubleshooting
 
@@ -109,10 +122,12 @@ const int REST_TIME = 3600000;    // Rest time in milliseconds (default: 60 min)
 - Check all connections, especially ground
 - Verify 5V power is reaching DRV8833 VCC
 - Ensure nSLEEP is tied HIGH (to VCC)
+- Check the DRV8833 SENSE pins are grounded, if your board brings them out
 - Test switches are in ON position
 
 **Motors run too fast/slow:**
 - Adjust RUN_TIME to compensate
+- Note that 3V motors run at about 5V in this design, which is above their rating
 - Consider PWM speed control (see advanced branch)
 
 **Only one motor works:**
@@ -121,7 +136,7 @@ const int REST_TIME = 3600000;    // Rest time in milliseconds (default: 60 min)
 - Test motor directly with power supply
 
 **Watch stops/overwinding:**
-- Increase REST_TIME (try 90 minutes)
+- Increase REST_TIME_BASE (try 90 minutes)
 - Some watches need less TPD than others
 
 ## License
